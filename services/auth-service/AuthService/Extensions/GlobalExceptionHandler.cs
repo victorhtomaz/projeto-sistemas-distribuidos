@@ -13,6 +13,14 @@ public sealed class GlobalExceptionHandler(
         Exception exception,
         CancellationToken cancellationToken)
     {
+        var statusCode = exception is BadHttpRequestException badHttpRequestException
+            ? badHttpRequestException.StatusCode
+            : StatusCodes.Status500InternalServerError;
+
+        var title = statusCode == StatusCodes.Status500InternalServerError
+            ? "Erro interno do servidor."
+            : "Requisição inválida.";
+
         logger.LogError(
             exception,
             "Exceção não tratada ao processar a requisição {Method} {Path}.",
@@ -21,15 +29,15 @@ public sealed class GlobalExceptionHandler(
 
         var problemDetails = new ProblemDetails
         {
-            Status = StatusCodes.Status500InternalServerError,
-            Title = "Erro interno do servidor.",
-            Detail = environment.IsDevelopment()
+            Status = statusCode,
+            Title = title,
+            Detail = environment.IsDevelopment() || statusCode != StatusCodes.Status500InternalServerError
                 ? exception.Message
                 : "Ocorreu um erro inesperado ao processar a requisição.",
             Instance = httpContext.Request.Path
         };
 
-        httpContext.Response.StatusCode = StatusCodes.Status500InternalServerError;
+        httpContext.Response.StatusCode = statusCode;
 
         // Delega a escrita padronizada de ProblemDetails (incluindo traceId) ao serviço nativo.
         return await problemDetailsService.TryWriteAsync(new ProblemDetailsContext

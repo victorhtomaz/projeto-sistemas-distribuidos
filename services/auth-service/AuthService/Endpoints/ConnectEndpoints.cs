@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using AuthService.Services;
 using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Authentication;
@@ -18,6 +19,94 @@ public static class ConnectEndpoints
         connectGroup.MapGet("/authorize", AuthorizeAsync)
             .WithName("Authorize")
             .Produces(StatusCodes.Status302Found);
+
+        connectGroup.MapPost("/token", TokenAsync)
+            .WithName("Token")
+            .DisableAntiforgery()
+            .Produces(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest);
+
+        connectGroup.MapGet("/userinfo", UserInfoAsync)
+            .WithName("UserInfo")
+            .Produces<IReadOnlyDictionary<string, object>>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
+    }
+
+    private static async Task<Results<Ok<IReadOnlyDictionary<string, object>>, ChallengeHttpResult, ForbidHttpResult>>
+        UserInfoAsync(
+            HttpContext httpContext,
+            IConnectService connectService,
+            CancellationToken cancellationToken)
+    {
+        // Valida o access_token Bearer extraído pelo middleware do OpenIddict.
+        var authenticateResult = await httpContext.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+        if (!authenticateResult.Succeeded || authenticateResult.Principal is null)
+        {
+            return TypedResults.Challenge(
+                properties: CreateOAuthErrorProperties(
+                    OpenIddictConstants.Errors.InvalidToken,
+                    "O token de acesso informado é inválido ou está ausente."),
+                authenticationSchemes: [OpenIddictServerAspNetCoreDefaults.AuthenticationScheme]);
+        }
+
+        var result = await connectService.GetUserInfoAsync(authenticateResult.Principal, cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            var properties = CreateOAuthErrorProperties(
+                result.ErrorCode ?? OpenIddictConstants.Errors.InvalidToken,
+                result.ErrorMessage);
+
+            if (result.ErrorCode == OpenIddictConstants.Errors.InsufficientScope)
+            {
+                return TypedResults.Forbid(
+                    properties: properties,
+                    authenticationSchemes: [OpenIddictServerAspNetCoreDefaults.AuthenticationScheme]);
+            }
+
+            return TypedResults.Challenge(
+                properties: properties,
+                authenticationSchemes: [OpenIddictServerAspNetCoreDefaults.AuthenticationScheme]);
+        }
+
+        return TypedResults.Ok(result.Claims!);
+    }
+
+    private static async Task<Results<SignInHttpResult, ForbidHttpResult>>
+        TokenAsync(
+            HttpContext httpContext,
+            IConnectService connectService,
+            CancellationToken cancellationToken)
+    {
+        var request = httpContext.GetOpenIddictServerRequest()
+            ?? throw new InvalidOperationException("Não foi possível recuperar a requisição OpenID Connect.");
+
+        ClaimsPrincipal? tokenPrincipal = null;
+
+        if (request.IsAuthorizationCodeGrantType() || request.IsRefreshTokenGrantType())
+        {
+            // Recupera o ClaimsPrincipal contido no authorization_code ou refresh_token já validado pelo OpenIddict.
+            var authenticateResult = await httpContext.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+            tokenPrincipal = authenticateResult.Principal;
+        }
+
+        var result = await connectService.ExchangeTokenAsync(request, tokenPrincipal, cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            return TypedResults.Forbid(
+                properties: CreateOAuthErrorProperties(
+                    result.ErrorCode ?? OpenIddictConstants.Errors.InvalidGrant,
+                    result.ErrorMessage),
+                authenticationSchemes: [OpenIddictServerAspNetCoreDefaults.AuthenticationScheme]);
+        }
+
+        // Devolve o ClaimsPrincipal ao OpenIddict para assinar e retornar os tokens (access_token, id_token e refresh_token).
+        return TypedResults.SignIn(
+            principal: result.Principal!,
+            properties: null,
+            authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
     }
 
     private static async Task<Results<SignInHttpResult, ChallengeHttpResult>>
@@ -59,5 +148,12 @@ public static class ConnectEndpoints
             properties: null,
             authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
     }
+
+    private static AuthenticationProperties CreateOAuthErrorProperties(string errorCode, string? errorDescription) =>
+        new(new Dictionary<string, string?>
+        {
+            [OpenIddictServerAspNetCoreConstants.Properties.Error] = errorCode,
+            [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = errorDescription
+        });
 }
 

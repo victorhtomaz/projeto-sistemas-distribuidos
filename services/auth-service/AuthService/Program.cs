@@ -13,7 +13,7 @@ var builder = WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException("The DefaultConnection connection string is not configured.");
 
-var loginUrl = builder.Configuration["Authentication:LoginUrl"] ?? "/api/auth/login";
+var loginUrl = builder.Configuration["Authentication:LoginUrl"] ?? "/auth/login";
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
@@ -31,17 +31,24 @@ builder.Services.AddOpenIddict()
     {
         options.SetAuthorizationEndpointUris("/connect/authorize");
         options.SetTokenEndpointUris("/connect/token");
+        options.SetRevocationEndpointUris("/connect/revoke");
+        options.SetUserInfoEndpointUris("/connect/userinfo");
         options.AllowAuthorizationCodeFlow()
             .RequireProofKeyForCodeExchange();
+
         options.SetJsonWebKeySetEndpointUris("/.well-known/jwks");
         options.AllowRefreshTokenFlow();
         options.AllowClientCredentialsFlow();
         options.RegisterScopes(Scopes.OpenId, Scopes.Email, Scopes.Profile, Scopes.OfflineAccess);
+
         options.AddDevelopmentEncryptionCertificate()
             .AddDevelopmentSigningCertificate();
+
+        options.DisableAccessTokenEncryption();
         var aspNetCoreBuilder = options.UseAspNetCore()
             .EnableAuthorizationEndpointPassthrough()
-            .EnableTokenEndpointPassthrough();
+            .EnableTokenEndpointPassthrough()
+            .EnableUserInfoEndpointPassthrough();
 
         if (builder.Environment.IsDevelopment())
         {
