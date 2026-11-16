@@ -59,6 +59,10 @@ Content-Type: application/json
   "password": "{{userPassword}}"
 }
 
+### 2.3 [Auth] Fazer logout (descarta cookie e revoga refresh_tokens do usuário)
+POST {{baseUrl}}/auth/logout
+Authorization: Bearer {{accessToken}}
+
 
 ### 3.1 [Authorization Code + PKCE] Solicitar authorization_code (requer cookie da etapa 2.2)
 # Dica: copie o parâmetro "code" do header "Location" na resposta 302 para @authorizationCode no topo.

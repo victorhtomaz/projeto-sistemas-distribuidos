@@ -3,10 +3,14 @@ using AuthService.Data;
 using AuthService.DTOs;
 using AuthService.Models;
 using Microsoft.EntityFrameworkCore;
+using OpenIddict.Abstractions;
+using static OpenIddict.Abstractions.OpenIddictConstants;
 
 namespace AuthService.Services;
 
-public sealed class UserService(ApplicationDbContext dbContext) : IUserService
+public sealed class UserService(
+    ApplicationDbContext dbContext,
+    IOpenIddictTokenManager tokenManager) : IUserService
 {
     public async Task<RegisterUserResult> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken)
     {
@@ -63,6 +67,19 @@ public sealed class UserService(ApplicationDbContext dbContext) : IUserService
 
         var response = new UserResponse(user.Id, user.Name, user.Email);
         return LoginUserResult.Success(response);
+    }
+
+    public async Task<LogoutUserResult> LogoutAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        // Localiza e revoga no banco todos os refresh tokens ativos vinculados ao usuário.
+        var revokedTokensCount = await tokenManager.RevokeAsync(
+            subject: userId.ToString(),
+            client: null,
+            status: Statuses.Valid,
+            type: TokenTypeHints.RefreshToken,
+            cancellationToken: cancellationToken);
+
+        return LogoutUserResult.Success(revokedTokensCount);
     }
 
     private static Dictionary<string, string[]>? ValidateRequest<TRequest>(TRequest request)

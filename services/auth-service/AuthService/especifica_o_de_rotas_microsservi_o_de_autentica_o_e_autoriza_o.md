@@ -55,21 +55,21 @@ Rotas responsáveis pelo ciclo de vida dos tokens e delegação de acesso.
 * **Implementação:** Híbrida (*Passthrough* do OpenIddict + Handler da aplicação).
 * **Finalidade:** Retorna dados atualizados do perfil a partir das informações contidas na entidade customizada de Usuário, mediante envio do `access_token` com o escopo `openid`.
 
-## 3. Gestão Customizada de Usuários, Sessões e Clientes (`/api`)
+## 3. Gestão Customizada de Usuários, Sessões e Clientes (`/`)
 
 Rotas implementadas via Minimal APIs usando um banco de dados próprio (`DbContext` puro) para usuários e os gerenciadores do OpenIddict (`IOpenIddictTokenManager`, `IOpenIddictApplicationManager`).
 
-### Autenticação e Ciclo de Sessão (`/api/auth`)
+### Autenticação e Ciclo de Sessão (`/auth`)
 
-#### `POST /api/auth/register`
+#### `POST /auth/register`
 
 * **Finalidade:** Cria uma nova conta na tabela própria de Usuários. A aplicação valida nome, email e senha, gera e armazena o hash da senha de forma segura com BCrypt.Net e retorna `201 Created` com os dados do usuário sem a senha.
 
-#### `POST /api/auth/login`
+#### `POST /auth/login`
 
 * **Finalidade:** Compara as credenciais recebidas com o hash armazenado no banco. Se válidas, estabelece um **cookie de sessão temporário e enxuto**. Este cookie serve estritamente para sinalizar ao endpoint `/connect/authorize` que o usuário é autêntico, permitindo a conclusão do fluxo OAuth.
 
-#### `POST /api/auth/logout`
+#### `POST /auth/logout`
 
 * **Finalidade:** Encerra a sessão:
   1. Descarta o cookie de autenticação temporário.
@@ -94,4 +94,3 @@ Rotas implementadas via Minimal APIs usando um banco de dados próprio (`DbConte
 | `POST` | `/api/auth/register` | Gestão de Usuários | Manual (Custom Entity + BCrypt) | 
 | `POST` | `/api/auth/login` | Gestão de Identidade | Manual (Cookie temporário) | 
 | `POST` | `/api/auth/logout` | Gestão de Sessão | Manual (Cookie + TokenManager) | 
-| `GET` / `POST` | `/api/clients` | Gestão de Clientes | Manual (AppManager) | 

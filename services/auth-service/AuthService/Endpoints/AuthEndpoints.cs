@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using static OpenIddict.Abstractions.OpenIddictConstants;
 
 namespace AuthService.Endpoints;
 
@@ -25,6 +26,11 @@ public static class AuthEndpoints
             .WithName("Login")
             .Produces<UserResponse>(StatusCodes.Status200OK)
             .ProducesValidationProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized);
+
+        authGroup.MapPost("/logout", LogoutAsync)
+            .WithName("Logout")
+            .Produces(StatusCodes.Status204NoContent)
             .ProducesProblem(StatusCodes.Status401Unauthorized);
     }
 
@@ -89,5 +95,62 @@ public static class AuthEndpoints
         await httpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
 
         return TypedResults.Ok(user);
+    }
+
+    private static async Task<Results<NoContent, ProblemHttpResult>>
+        LogoutAsync(
+            IUserService userService,
+            HttpContext httpContext,
+            CancellationToken cancellationToken)
+    {
+        var userId = await ResolveAuthenticatedUserIdAsync(httpContext);
+
+        // Descarta o cookie temporário de sessão independentemente da origem da autenticação.
+        await httpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+
+        if (userId is null)
+        {
+            return TypedResults.Problem(
+                title: "Sessão não encontrada.",
+                detail: "Não foi possível identificar um usuário autenticado para encerrar a sessão.",
+                statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        await userService.LogoutAsync(userId.Value, cancellationToken);
+
+        return TypedResults.NoContent();
+    }
+
+    private static async Task<Guid?> ResolveAuthenticatedUserIdAsync(HttpContext httpContext)
+    {
+        // Tenta primeiro a identidade Bearer validada pelo esquema padrão (OpenIddict Validation).
+        if (TryExtractUserId(httpContext.User, out var bearerUserId))
+        {
+            return bearerUserId;
+        }
+
+        // Caso não haja token Bearer, verifica o cookie temporário da sessão de login.
+        var cookieAuthResult = await httpContext.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        if (cookieAuthResult.Succeeded && TryExtractUserId(cookieAuthResult.Principal, out var cookieUserId))
+        {
+            return cookieUserId;
+        }
+
+        return null;
+    }
+
+    private static bool TryExtractUserId(ClaimsPrincipal? principal, out Guid userId)
+    {
+        userId = Guid.Empty;
+
+        if (principal?.Identity?.IsAuthenticated != true)
+        {
+            return false;
+        }
+
+        var subject = principal.FindFirst(Claims.Subject)?.Value
+            ?? principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        return Guid.TryParse(subject, out userId);
     }
 }

@@ -7,6 +7,8 @@ public interface IUserService
     Task<RegisterUserResult> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken);
 
     Task<LoginUserResult> LoginAsync(LoginRequest request, CancellationToken cancellationToken);
+
+    Task<LogoutUserResult> LogoutAsync(Guid userId, CancellationToken cancellationToken);
 }
 
 public sealed record RegisterUserResult : IServiceResult
@@ -49,5 +51,19 @@ public sealed record LoginUserResult : IServiceResult
 
     public static LoginUserResult Unauthorized(string errorMessage) =>
         new() { IsUnauthorized = true, ErrorMessage = errorMessage };
+}
+
+public sealed record LogoutUserResult : IServiceResult
+{
+    public bool IsSuccess { get; init; }
+
+    public long RevokedTokensCount { get; init; }
+
+    public IDictionary<string, string[]>? ValidationErrors { get; init; }
+
+    public string? ErrorMessage { get; init; }
+
+    public static LogoutUserResult Success(long revokedTokensCount) =>
+        new() { IsSuccess = true, RevokedTokensCount = revokedTokensCount };
 }
 

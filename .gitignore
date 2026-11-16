@@ -1,0 +1,5 @@
+.env
+certs/*.pfx
+certs/*.p12
+certs/*.pem
+certs/*.key
