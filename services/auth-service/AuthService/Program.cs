@@ -2,14 +2,18 @@ using AuthService.Data;
 using AuthService.Endpoints;
 using AuthService.Extensions;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using OpenIddict.Validation.AspNetCore;
 using Scalar.AspNetCore;
+using static OpenIddict.Abstractions.OpenIddictConstants;
 
 var builder = WebApplication.CreateBuilder(args);
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException("The DefaultConnection connection string is not configured.");
+
+var loginUrl = builder.Configuration["Authentication:LoginUrl"] ?? "/api/auth/login";
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
@@ -27,15 +31,22 @@ builder.Services.AddOpenIddict()
     {
         options.SetAuthorizationEndpointUris("/connect/authorize");
         options.SetTokenEndpointUris("/connect/token");
-        options.AllowAuthorizationCodeFlow();
+        options.AllowAuthorizationCodeFlow()
+            .RequireProofKeyForCodeExchange();
         options.SetJsonWebKeySetEndpointUris("/.well-known/jwks");
         options.AllowRefreshTokenFlow();
         options.AllowClientCredentialsFlow();
+        options.RegisterScopes(Scopes.OpenId, Scopes.Email, Scopes.Profile, Scopes.OfflineAccess);
         options.AddDevelopmentEncryptionCertificate()
             .AddDevelopmentSigningCertificate();
-        options.UseAspNetCore()
+        var aspNetCoreBuilder = options.UseAspNetCore()
             .EnableAuthorizationEndpointPassthrough()
             .EnableTokenEndpointPassthrough();
+
+        if (builder.Environment.IsDevelopment())
+        {
+            aspNetCoreBuilder.DisableTransportSecurityRequirement();
+        }
     })
     .AddValidation(options =>
     {
@@ -59,6 +70,17 @@ builder.Services.AddAuthentication(options =>
         : CookieSecurePolicy.Always;
     options.ExpireTimeSpan = TimeSpan.FromMinutes(15);
     options.SlidingExpiration = false;
+    options.Events.OnRedirectToLogin = context =>
+    {
+        // Redireciona para a URL de login configurada (relativa ou absoluta) preservando o ReturnUrl.
+        var returnUrl = context.Properties.RedirectUri;
+        var targetUrl = !string.IsNullOrWhiteSpace(returnUrl)
+            ? QueryHelpers.AddQueryString(loginUrl, context.Options.ReturnUrlParameter, returnUrl)
+            : loginUrl;
+
+        context.Response.Redirect(targetUrl);
+        return Task.CompletedTask;
+    };
 });
 
 builder.Services.AddAuthorization();
@@ -81,5 +103,6 @@ app.UseAuthorization();
 
 app.MapGet("/", () => "Em funcionamento");
 app.MapAuthEndpoints();
+app.MapConnectEndpoints();
 
 app.Run();

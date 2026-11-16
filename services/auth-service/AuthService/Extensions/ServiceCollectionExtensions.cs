@@ -1,3 +1,4 @@
+using AuthService.Data;
 using AuthService.Services;
 
 namespace AuthService.Extensions;
@@ -12,6 +13,10 @@ public static class ServiceCollectionExtensions
 
         // Registra os serviços de regra de negócio da aplicação.
         services.AddScoped<IUserService, UserService>();
+        services.AddScoped<IConnectService, ConnectService>();
+
+        // Registra o seeder de aplicações clientes OAuth/OIDC do OpenIddict.
+        services.AddHostedService<OpenIddictSeeder>();
 
         return services;
     }
