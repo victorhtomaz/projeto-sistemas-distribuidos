@@ -41,8 +41,7 @@ builder.Services.AddOpenIddict()
         options.AllowClientCredentialsFlow();
         options.RegisterScopes(Scopes.OpenId, Scopes.Email, Scopes.Profile, Scopes.OfflineAccess);
 
-        options.AddDevelopmentEncryptionCertificate()
-            .AddDevelopmentSigningCertificate();
+        options.AddConfiguredCertificates(builder.Configuration, builder.Environment);
 
         options.DisableAccessTokenEncryption();
         var aspNetCoreBuilder = options.UseAspNetCore()
@@ -112,4 +111,6 @@ app.MapGet("/", () => "Em funcionamento");
 app.MapAuthEndpoints();
 app.MapConnectEndpoints();
 
-app.Run();
+await app.ApplyMigrationsAsync();
+
+await app.RunAsync();
