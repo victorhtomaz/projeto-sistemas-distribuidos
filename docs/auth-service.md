@@ -36,51 +36,52 @@ O diagrama abaixo ilustra o fluxo completo de autenticação de usuário via **A
 sequenceDiagram
     autonumber
     actor U as Usuário (Browser)
-    participant C as Cliente Web (web-client)
-    participant F as Tela de Login (LoginUrl)
-    participant A as AuthService
+    participant FE as Frontend (web-client)
+    participant AS as AuthService (OpenIddict)
     participant DB as PostgreSQL
 
-    Note over C: Gera code_verifier,<br/>code_challenge (S256) e state
+    Note over U,DB: Fase 1 - Autorização e login
 
-    U->>C: Acessa área protegida / inicia login
-    C-->>U: 302 Redirect para /connect/authorize<br/>(client_id, redirect_uri, response_type=code,<br/>scope, code_challenge, code_challenge_method=S256, state)
+    U->>FE: Inicia login
+    Note right of FE: Gera code_verifier,<br/>code_challenge e state
+    FE->>U: Navega para /connect/authorize
+    U->>AS: GET /connect/authorize
+    AS->>AS: Verifica cookie de sessão
 
-    U->>A: GET /connect/authorize?...
-    A->>A: Valida parâmetros OAuth/PKCE (OpenIddict)<br/>e verifica cookie .AuthService.Session
-
-    alt Cookie ausente, expirado ou usuário inexistente
-        A-->>U: 302 Redirect para LoginUrl?ReturnUrl=/connect/authorize?...
-        U->>F: Carrega página de login
-        F->>A: POST /auth/login { email, password }
-        A->>DB: Busca usuário por e-mail normalizado
-        DB-->>A: Registro do usuário (PasswordHash)
-        A->>A: Verifica senha com BCrypt
-        A-->>F: 200 OK (UserResponse) +<br/>Set-Cookie: .AuthService.Session (15 min)
-        F-->>U: Redireciona para o ReturnUrl
-        U->>A: GET /connect/authorize?... (com cookie .AuthService.Session)
+    alt Sem sessão ativa
+        AS-->>U: 302 para tela de login (returnUrl)
+        U->>FE: Informa credenciais
+        FE->>AS: POST /auth/login
+        AS->>DB: Valida usuário e senha
+        DB-->>AS: Usuário válido
+        AS-->>FE: 200 OK + Set-Cookie
+        FE->>U: Navega para returnUrl
+        U->>AS: GET /connect/authorize (com cookie)
+    else Com sessão ativa
+        Note over AS: Segue direto para emissão do code
     end
 
-    A->>DB: Revalida existência do usuário por ID
-    DB-->>A: Dados atualizados do usuário
-    A->>A: Constrói ClaimsPrincipal (sub, name, email) e escopos
-    A-->>U: 302 Redirect para redirect_uri?code={authorization_code}&state={state}
+    AS-->>U: 302 para redirect_uri?code=...&state=...
 
-    U->>C: Envia code e state para o callback
-    C->>C: Valida state recebido
+    Note over U,DB: Fase 2 - Troca do code por tokens
 
-    C->>A: POST /connect/token (form-urlencoded)<br/>grant_type=authorization_code, client_id,<br/>client_secret, code, redirect_uri, code_verifier
-    A->>A: Valida client_secret, authorization_code<br/>e PKCE (SHA256(code_verifier) == code_challenge)
-    A->>DB: Reconsulta usuário por sub para atualizar claims
-    DB-->>A: Usuário ativo
-    A-->>C: 200 OK JSON<br/>{ access_token, id_token, refresh_token,<br/>token_type: "Bearer", expires_in, scope }
+    U->>FE: Segue o redirect (/callback)
+    FE->>FE: Valida state
+    FE->>AS: POST /connect/token<br/>(code, code_verifier)
+    AS->>DB: Valida code e usuário
+    DB-->>AS: Válido
+    AS->>AS: Valida PKCE
+    AS-->>FE: 200 OK (access_token, id_token, refresh_token)
 
-    opt Consulta de perfil OIDC
-        C->>A: GET /connect/userinfo<br/>Authorization: Bearer {access_token}
-        A->>DB: Busca usuário atualizado (se escopo openid presente)
-        DB-->>A: Dados do usuário
-        A-->>C: 200 OK JSON { sub, name, email }
+    Note over U,DB: Fase 3 - Perfil (opcional)
+
+    opt Scope openid / profile
+        FE->>AS: GET /connect/userinfo (Bearer)
+        AS->>DB: Busca perfil
+        DB-->>AS: Dados do usuário
+        AS-->>FE: 200 OK (sub, name, email)
     end
+```
 ```
 
 ---
