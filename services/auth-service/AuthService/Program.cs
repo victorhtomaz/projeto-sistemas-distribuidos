@@ -28,6 +28,7 @@ builder.Services.AddOpenIddict()
         options.SetAuthorizationEndpointUris("/connect/authorize");
         options.SetTokenEndpointUris("/connect/token");
         options.AllowAuthorizationCodeFlow();
+        options.SetJsonWebKeySetEndpointUris("/.well-known/jwks");
         options.AllowRefreshTokenFlow();
         options.AllowClientCredentialsFlow();
         options.AddDevelopmentEncryptionCertificate()
