@@ -38,11 +38,35 @@ public sealed class UserService(ApplicationDbContext dbContext) : IUserService
         dbContext.Users.Add(user);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        var response = new UserResponse(user.Id, user.Name, user.Email);
-        return RegisterUserResult.Success(response);
+        return RegisterUserResult.Success();
     }
 
-    private static Dictionary<string, string[]>? ValidateRequest(RegisterRequest request)
+    public async Task<LoginUserResult> LoginAsync(LoginRequest request, CancellationToken cancellationToken)
+    {
+        // Valida os atributos de entrada do DTO antes de consultar o banco de dados.
+        var validationErrors = ValidateRequest(request);
+        if (validationErrors is not null)
+        {
+            return LoginUserResult.ValidationFailure(validationErrors);
+        }
+
+        var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+        var user = await dbContext.Users
+            .AsNoTracking()
+            .FirstOrDefaultAsync(existingUser => existingUser.Email == normalizedEmail, cancellationToken);
+
+        // Retorna mensagem genérica para evitar enumeração de e-mails cadastrados.
+        if (user is null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+        {
+            return LoginUserResult.Unauthorized("E-mail ou senha inválidos.");
+        }
+
+        var response = new UserResponse(user.Id, user.Name, user.Email);
+        return LoginUserResult.Success(response);
+    }
+
+    private static Dictionary<string, string[]>? ValidateRequest<TRequest>(TRequest request)
+        where TRequest : notnull
     {
         var validationResults = new List<ValidationResult>();
         var validationContext = new ValidationContext(request);
