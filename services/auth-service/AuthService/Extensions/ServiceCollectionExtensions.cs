@@ -18,6 +18,9 @@ public static class ServiceCollectionExtensions
         // Registra o seeder de aplicações clientes OAuth/OIDC do OpenIddict.
         services.AddHostedService<OpenIddictSeeder>();
 
+        // Registra o seeder do usuário administrador inicial.
+        services.AddHostedService<AdminUserSeeder>();
+
         return services;
     }
 }

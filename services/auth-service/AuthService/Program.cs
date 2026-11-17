@@ -39,7 +39,7 @@ builder.Services.AddOpenIddict()
         options.SetJsonWebKeySetEndpointUris("/.well-known/jwks");
         options.AllowRefreshTokenFlow();
         options.AllowClientCredentialsFlow();
-        options.RegisterScopes(Scopes.OpenId, Scopes.Email, Scopes.Profile, Scopes.OfflineAccess);
+        options.RegisterScopes(Scopes.OpenId, Scopes.Email, Scopes.Profile, Scopes.Roles, Scopes.OfflineAccess);
 
         options.AddConfiguredCertificates(builder.Configuration, builder.Environment);
 

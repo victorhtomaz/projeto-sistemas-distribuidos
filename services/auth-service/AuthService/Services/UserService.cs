@@ -36,7 +36,8 @@ public sealed class UserService(
             Id = Guid.NewGuid(),
             Name = request.Name.Trim(),
             Email = normalizedEmail,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password)
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
+            Role = UserRole.User
         };
 
         dbContext.Users.Add(user);
@@ -65,7 +66,11 @@ public sealed class UserService(
             return LoginUserResult.Unauthorized("E-mail ou senha inválidos.");
         }
 
-        var response = new UserResponse(user.Id, user.Name, user.Email);
+        var response = new UserResponse(
+            user.Id,
+            user.Name,
+            user.Email,
+            user.Role.ToString().ToLowerInvariant());
         return LoginUserResult.Success(response);
     }
 

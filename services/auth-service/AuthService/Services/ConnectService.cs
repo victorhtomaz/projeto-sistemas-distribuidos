@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Security.Claims;
 using AuthService.Data;
+using AuthService.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using OpenIddict.Abstractions;
@@ -34,7 +35,7 @@ public sealed class ConnectService(
             return AuthorizeResult.Unauthorized("Usuário associado à sessão não foi encontrado.");
         }
 
-        var principal = CreateUserPrincipal(user.Id, user.Name, user.Email, requestedScopes);
+        var principal = CreateUserPrincipal(user.Id, user.Name, user.Email, user.Role, requestedScopes);
         return AuthorizeResult.Success(principal);
     }
 
@@ -104,6 +105,11 @@ public sealed class ConnectService(
             claims[Claims.Email] = user.Email;
         }
 
+        if (tokenPrincipal.HasScope(Scopes.Roles) || tokenPrincipal.HasScope(Scopes.Profile))
+        {
+            claims[Claims.Role] = user.Role.ToString().ToLowerInvariant();
+        }
+
         return UserInfoResult.Success(claims);
     }
 
@@ -141,6 +147,7 @@ public sealed class ConnectService(
             user.Id,
             user.Name,
             user.Email,
+            user.Role,
             scopes,
             tokenPrincipal!.GetResources());
 
@@ -187,6 +194,7 @@ public sealed class ConnectService(
         Guid userId,
         string name,
         string email,
+        UserRole role,
         ImmutableArray<string> scopes,
         ImmutableArray<string> resources = default)
     {
@@ -198,7 +206,8 @@ public sealed class ConnectService(
 
         identity.SetClaim(Claims.Subject, userId.ToString())
             .SetClaim(Claims.Name, name)
-            .SetClaim(Claims.Email, email);
+            .SetClaim(Claims.Email, email)
+            .SetClaim(Claims.Role, role.ToString().ToLowerInvariant());
 
         identity.SetScopes(scopes);
 
@@ -231,6 +240,17 @@ public sealed class ConnectService(
                 yield return Destinations.AccessToken;
 
                 if (claim.Subject is not null && claim.Subject.HasScope(Scopes.Email))
+                {
+                    yield return Destinations.IdentityToken;
+                }
+
+                yield break;
+
+            case Claims.Role:
+                yield return Destinations.AccessToken;
+
+                if (claim.Subject is not null &&
+                    (claim.Subject.HasScope(Scopes.Roles) || claim.Subject.HasScope(Scopes.Profile)))
                 {
                     yield return Destinations.IdentityToken;
                 }
