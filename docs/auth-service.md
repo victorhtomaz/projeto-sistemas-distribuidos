@@ -82,6 +82,41 @@ sequenceDiagram
         AS-->>FE: 200 OK (sub, name, email)
     end
 ```
+
+---
+
+## Diagrama de Estado do Fluxo de Autenticação
+
+O diagrama abaixo representa o ciclo de estados da autenticação do usuário no `AuthService` (em **Autenticado**, o cliente também pode consultar `GET /connect/userinfo` com o `access_token` e revogar tokens em `POST /connect/revoke`):
+
+```mermaid
+stateDiagram-v2
+    [*] --> NaoAutenticado
+
+    state "Não Autenticado" as NaoAutenticado
+    state "Aguardando Login" as AguardandoLogin
+    state "Sessão Temporária" as SessaoTemporaria
+    state "Código Emitido" as CodigoEmitido
+    state "Autenticado" as Autenticado
+    state "Token Expirado" as TokenExpirado
+    state "Sessão Encerrada" as SessaoEncerrada
+
+    NaoAutenticado --> AguardandoLogin: GET /connect/authorize sem cookie
+    NaoAutenticado --> SessaoTemporaria: POST /auth/login válido
+    AguardandoLogin --> SessaoTemporaria: POST /auth/login válido
+
+    SessaoTemporaria --> CodigoEmitido: GET /connect/authorize válido
+    SessaoTemporaria --> NaoAutenticado: Cookie expirado ou logout
+
+    CodigoEmitido --> Autenticado: POST /connect/token válido
+    CodigoEmitido --> NaoAutenticado: Code ou PKCE inválido
+
+    Autenticado --> TokenExpirado: Expiração do access_token
+    TokenExpirado --> Autenticado: Refresh token válido
+
+    Autenticado --> SessaoEncerrada: POST /auth/logout
+    TokenExpirado --> SessaoEncerrada: Refresh token revogado
+    SessaoEncerrada --> [*]
 ```
 
 ---
