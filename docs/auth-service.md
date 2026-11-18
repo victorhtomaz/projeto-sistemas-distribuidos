@@ -23,7 +23,7 @@ O serviço foi desenvolvido em **.NET 10 (`net10.0`)** utilizando **Minimal APIs
 * **Sessão Temporária de Login:** O endpoint `POST /auth/login` emite o cookie `.AuthService.Session` (`HttpOnly`, `SameSite=Lax`, validade fixa de **15 minutos** sem *sliding expiration*), utilizado exclusivamente para autenticar o usuário durante o redirecionamento ao `/connect/authorize`.
 * **Tratamento Global de Erros:** Exceções não tratadas e erros de deserialização são convertidos em respostas padronizadas `ProblemDetails` (RFC 7807/9457) pelo `GlobalExceptionHandler`.
 * **Clientes Pré-cadastrados (`OpenIddictSeeder`):**
-  * `web-client` (Confidencial): suporta `authorization_code` e `refresh_token`, exige PKCE (`RequirePkce: true`), escopos `openid`, `email`, `profile`, `offline_access`, `redirect_uri` padrão `http://localhost:3000/callback`.
+  * `web-client` (Público): suporta `authorization_code` e `refresh_token`, exige PKCE (`RequirePkce: true`), escopos `openid`, `email`, `profile`, `offline_access`, `redirect_uri` padrão `http://localhost:3000/callback`.
   * `service-client` (Confidencial): suporta `client_credentials` (`RequirePkce: false`).
 
 ---
@@ -316,7 +316,7 @@ O formato dos parâmetros de entrada varia conforme o `grant_type` utilizado:
 | :--- | :--- | :--- | :--- | :--- |
 | `grant_type` | Form Body | **Sim** | `"authorization_code"` | Identifica a troca do código de autorização por tokens. |
 | `client_id` | Form Body (ou Basic Auth) | **Sim** | `string` (ex.: `web-client`) | Identificador do cliente que obteve o `code`. |
-| `client_secret` | Form Body (ou Basic Auth) | Condicional | `string` (ex.: `dev-secret-123`) | Obrigatório para clientes confidenciais (que possuem `ClientSecret` cadastrado). |
+| `client_secret` | Form Body (ou Basic Auth) | Condicional | `string` (omitido para clientes públicos) | Obrigatório apenas para clientes confidenciais (que possuem `ClientSecret` cadastrado). Clientes públicos como `web-client` devem omitir este parâmetro. |
 | `code` | Form Body | **Sim** | `string` | Código de autorização retornado pelo `/connect/authorize`. |
 | `redirect_uri` | Form Body | **Sim** | `string` URL | Deve corresponder exatamente à `redirect_uri` enviada em `/connect/authorize`. |
 | `code_verifier` | Form Body | **Sim** | `string` (43–128 chars) | Segredo original PKCE cujo hash corresponde ao `code_challenge` enviado anteriormente. |
@@ -327,7 +327,7 @@ O formato dos parâmetros de entrada varia conforme o `grant_type` utilizado:
 | :--- | :--- | :--- | :--- | :--- |
 | `grant_type` | Form Body | **Sim** | `"refresh_token"` | Identifica a renovação de sessão via refresh token. |
 | `client_id` | Form Body (ou Basic Auth) | **Sim** | `string` (ex.: `web-client`) | Identificador da aplicação cliente. |
-| `client_secret` | Form Body (ou Basic Auth) | Condicional | `string` (ex.: `dev-secret-123`) | Obrigatório para clientes confidenciais. |
+| `client_secret` | Form Body (ou Basic Auth) | Condicional | `string` (omitido para clientes públicos) | Obrigatório apenas para clientes confidenciais; omitido para clientes públicos como `web-client`. |
 | `refresh_token` | Form Body | **Sim** | `string` | Refresh token válido emitido anteriormente (requer escopo `offline_access`). |
 | `scope` | Form Body | Opcional | `string` separado por espaço | Permite *downscoping* (solicitar um subconjunto dos escopos concedidos originalmente). Se omitido, mantém os escopos originais. |
 
@@ -386,7 +386,7 @@ Endpoint padronizado pela **RFC 7009** e gerenciado 100% automaticamente pelo mi
 | `token` | Form Body | **Sim** | `string` | O token a ser revogado (ex.: valor do `refresh_token`). |
 | `token_type_hint` | Form Body | Opcional | `"refresh_token"` \| `"access_token"` | Dica para o servidor identificar o tipo do token informado. |
 | `client_id` | Form Body (ou Basic Auth) | **Sim** | `string` (ex.: `web-client`) | Identificador do cliente proprietário do token. |
-| `client_secret` | Form Body (ou Basic Auth) | Condicional | `string` (ex.: `dev-secret-123`) | Obrigatório para clientes confidenciais. |
+| `client_secret` | Form Body (ou Basic Auth) | Condicional | `string` (omitido para clientes públicos) | Obrigatório apenas para clientes confidenciais; omitido para clientes públicos como `web-client`. |
 
 #### Saídas
 

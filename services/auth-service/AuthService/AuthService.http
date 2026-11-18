@@ -10,9 +10,8 @@
 @userEmail = teste@exemplo.com
 @userPassword = Password123!
 
-# Cliente Web (Authorization Code + PKCE e Refresh Token)
+# Cliente Web Público (Authorization Code + PKCE e Refresh Token)
 @webClientId = web-client
-@webClientSecret = dev-secret-123
 @redirectUri = http%3A%2F%2Flocalhost%3A3000%2Fcallback
 @scopes = openid%20email%20profile%20offline_access
 
@@ -72,7 +71,7 @@ GET {{baseUrl}}/connect/authorize?client_id={{webClientId}}&redirect_uri={{redir
 POST {{baseUrl}}/connect/token
 Content-Type: application/x-www-form-urlencoded
 
-grant_type=authorization_code&client_id={{webClientId}}&client_secret={{webClientSecret}}&code={{authorizationCode}}&redirect_uri={{redirectUri}}&code_verifier={{codeVerifier}}
+grant_type=authorization_code&client_id={{webClientId}}&code={{authorizationCode}}&redirect_uri={{redirectUri}}&code_verifier={{codeVerifier}}
 
 
 ### 4.1 [Refresh Token] Renovar tokens com rotação automática
@@ -80,7 +79,7 @@ grant_type=authorization_code&client_id={{webClientId}}&client_secret={{webClien
 POST {{baseUrl}}/connect/token
 Content-Type: application/x-www-form-urlencoded
 
-grant_type=refresh_token&client_id={{webClientId}}&client_secret={{webClientSecret}}&refresh_token={{refreshToken}}
+grant_type=refresh_token&client_id={{webClientId}}&refresh_token={{refreshToken}}
 
 
 ### 5.1 [Client Credentials] Obter access_token M2M entre microsserviços
@@ -94,7 +93,7 @@ grant_type=client_credentials&client_id={{serviceClientId}}&client_secret={{serv
 POST {{baseUrl}}/connect/revoke
 Content-Type: application/x-www-form-urlencoded
 
-token={{refreshToken}}&token_type_hint=refresh_token&client_id={{webClientId}}&client_secret={{webClientSecret}}
+token={{refreshToken}}&token_type_hint=refresh_token&client_id={{webClientId}}
 
 
 ### 7.1 [UserInfo] Obter perfil atualizado do usuário autenticado (OIDC)
